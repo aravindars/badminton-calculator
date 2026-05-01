@@ -1,5 +1,5 @@
 function calculate() {
-    // 1. Inputs
+    // 1. Get Inputs
     const fullFee = parseFloat(document.getElementById('fullFee').value) || 0;
     const cashPaid = parseFloat(document.getElementById('cashPaid').value) || 0;
     const shuttles = parseFloat(document.getElementById('shuttleCost').value) || 0;
@@ -15,44 +15,42 @@ function calculate() {
     // 2. Base Shuttle Share (Everyone pays this)
     const sShare = shuttles / totalPlayers;
 
-    // 3. No-Card Price (Full share of court + shuttles)
-    let cn = (fullFee / totalPlayers) + sShare;
+    // 3. No-Card Player Calculation (Surplus Protected)
+    // First, calculate the "Theoretical" court share
+    let noCardCourtShare = fullFee / totalPlayers;
 
-    // 4. SURPLUS PROTECTION
-    // The total out-of-pocket is Cash + Shuttles. Total recovered cannot exceed this.
-    const totalOutofPocket = cashPaid + shuttles;
-    
-    // If No-Card users' combined share exceeds total spent, cap it to an equal split
-    if ((cn * cNone) > totalOutofPocket) {
-        cn = totalOutofPocket / totalPlayers;
+    // IMPORTANT: If No-Card court shares combined exceed the actual Cash Paid, 
+    // we cap them at an equal split of the Cash Paid.
+    const totalCashToRecover = cashPaid;
+    if ((noCardCourtShare * cNone) > totalCashToRecover) {
+        noCardCourtShare = totalCashToRecover / totalPlayers;
     }
 
-    // 5. Remaining Cash Logic for Card Users
-    // Calculate how much cash is still needed after No-Card users pay their part
-    const noCardCourtContribution = Math.max(0, cn - sShare);
-    const remainingCashToRecover = Math.max(0, cashPaid - (noCardCourtContribution * cNone));
+    const cn = noCardCourtShare + sShare;
+
+    // 4. Calculate Remaining Cash for Card Users
+    // This ensures we recover exactly the Cash Paid + Shuttles
+    const remainingCash = Math.max(0, totalCashToRecover - (noCardCourtShare * cNone));
     
     const cardCount = cPlus + cLight;
     const plusBenefit = Math.max(1, Math.floor(hours)) * 15.0;
     const lightBenefit = 15.0;
     const gap = plusBenefit - lightBenefit;
 
-    let cp = sShare; // Start with shuttle cost base
+    let cp = sShare; 
     let cl = sShare;
 
     if (cardCount > 0) {
-        // Distribute the remaining CASH debt while maintaining the Benefit Gap
-        let cashShareLight = (remainingCashToRecover + (cPlus * gap)) / cardCount;
+        // Split remaining cash among card users based on their card type
+        let cashShareLight = (remainingCash + (cPlus * gap)) / cardCount;
         let cashSharePlus = cashShareLight - gap;
 
-        // Ensure cash shares are not negative (cards only discount court, not shuttles)
+        // Ensure card users don't get a negative cash price
         cp += Math.max(0, cashSharePlus);
         cl += Math.max(0, cashShareLight);
-    } else {
-        cp = 0; cl = 0;
     }
 
-    // 6. Update UI
+    // 5. Update UI
     document.getElementById('plusLabel').innerText = `PLUS (max ${plusBenefit} PLN off court)`;
     document.getElementById('lightLabel').innerText = `LIGHT (max ${lightBenefit} PLN off court)`;
 
@@ -60,6 +58,7 @@ function calculate() {
     document.getElementById('resLight').innerText = cl.toFixed(2) + " PLN";
     document.getElementById('resNoCard').innerText = cn.toFixed(2) + " PLN";
 
+    // 6. Validation
     const totalCollected = (cp * cPlus) + (cl * cLight) + (cn * cNone);
     const vBox = document.getElementById('validationBox');
     vBox.className = "validation-box valid-ok";
